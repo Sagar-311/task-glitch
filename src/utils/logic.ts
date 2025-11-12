@@ -134,7 +134,9 @@ export function daysBetween(aISO: string, bISO: string): number {
 export function computeVelocityByPriority(tasks: ReadonlyArray<Task>): Record<Task['priority'], { avgDays: number; medianDays: number }> {
   const groups: Record<Task['priority'], number[]> = { High: [], Medium: [], Low: [] };
   tasks.forEach(t => {
-    if (t.completedAt) groups[t.priority].push(daysBetween(t.createdAt, t.completedAt));
+    if (t.completedAt && t.createdAt) {
+  groups[t.priority].push(daysBetween(t.createdAt, t.completedAt));
+}
   });
   const stats: Record<Task['priority'], { avgDays: number; medianDays: number }> = { High: { avgDays: 0, medianDays: 0 }, Medium: { avgDays: 0, medianDays: 0 }, Low: { avgDays: 0, medianDays: 0 } };
   (Object.keys(groups) as Task['priority'][]).forEach(k => {
@@ -198,7 +200,7 @@ export function computeCohortRevenue(tasks: ReadonlyArray<Task>): Array<{ week: 
   const rows: Array<{ week: string; priority: Task['priority']; revenue: number }> = [];
   const byKey = new Map<string, number>();
   tasks.forEach(t => {
-    const d = new Date(t.createdAt);
+    const d = new Date(t.createdAt ?? new Date().toISOString());
     const key = `${d.getUTCFullYear()}-W${getWeekNumber(d)}|${t.priority}`;
     byKey.set(key, (byKey.get(key) ?? 0) + t.revenue);
   });

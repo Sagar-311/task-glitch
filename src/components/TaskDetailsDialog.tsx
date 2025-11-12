@@ -41,7 +41,16 @@ export default function TaskDetailsDialog({ open, task, onClose, onSave }: Props
           <Typography variant="h6" fontWeight={700}>{task.title}</Typography>
           <Divider />
           <Typography variant="body2" color="text.secondary">
-            Created: {new Date(task.createdAt).toLocaleString()} {task.completedAt ? `• Completed: ${new Date(task.completedAt).toLocaleString()} • Cycle: ${daysBetween(task.createdAt, task.completedAt)}d` : ''}
+           Created:{' '}
+{task.createdAt
+  ? new Date(task.createdAt).toLocaleString()
+  : 'N/A'}
+{' '}
+{task.completedAt
+  ? `• Completed: ${new Date(task.completedAt).toLocaleString()} • Cycle: ${
+      daysBetween(task.createdAt ?? new Date().toISOString(), task.completedAt)
+    }d`
+  : ''}
           </Typography>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <TextField label="Revenue" type="number" value={revenue} onChange={e => setRevenue(e.target.value === '' ? '' : Number(e.target.value))} fullWidth />
