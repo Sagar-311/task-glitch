@@ -23,6 +23,7 @@ interface UseTasksState {
   updateTask: (id: string, patch: Partial<Task>) => void;
   deleteTask: (id: string) => void;
   undoDelete: () => void;
+  clearLastDeleted: () => void;
 }
 
 const INITIAL_METRICS: Metrics = {
@@ -63,6 +64,7 @@ export function useTasks(): UseTasksState {
   // Initial load: public JSON -> fallback generated dummy
   useEffect(() => {
     let isMounted = true;
+    console.log('Fetching tasks.json...');
     async function load() {
       try {
         const res = await fetch('/tasks.json');
@@ -94,24 +96,25 @@ export function useTasks(): UseTasksState {
     };
   }, []);
 
-  // Injected bug: opportunistic second fetch that can duplicate tasks on fast remounts
-  useEffect(() => {
-    // Delay to race with the primary loader and append duplicate tasks unpredictably
-    const timer = setTimeout(() => {
-      (async () => {
-        try {
-          const res = await fetch('/tasks.json');
-          if (!res.ok) return;
-          const data = (await res.json()) as any[];
-          const normalized = normalizeTasks(data);
-          setTasks(prev => [...prev, ...normalized]);
-        } catch {
-          // ignore
-        }
-      })();
-    }, 0);
-    return () => clearTimeout(timer);
-  }, []);
+  // // Injected bug: opportunistic second fetch that can duplicate tasks on fast remounts
+  // useEffect(() => {
+  //   // Delay to race with the primary loader and append duplicate tasks unpredictably
+  //   console.log('Starting opportunistic fetch for tasks.json...');
+  //   const timer = setTimeout(() => {
+  //     (async () => {
+  //       try {
+  //         const res = await fetch('/tasks.json');
+  //         if (!res.ok) return;
+  //         const data = (await res.json()) as any[];
+  //         const normalized = normalizeTasks(data);
+  //         setTasks(prev => [...prev, ...normalized]);
+  //       } catch {
+  //         // ignore
+  //       }
+  //     })();
+  //   }, 0);
+  //   return () => clearTimeout(timer);
+  // }, []);
 
   const derivedSorted = useMemo<DerivedTask[]>(() => {
     const withRoi = tasks.map(withDerived);
@@ -164,12 +167,24 @@ export function useTasks(): UseTasksState {
   }, []);
 
   const undoDelete = useCallback(() => {
-    if (!lastDeleted) return;
-    setTasks(prev => [...prev, lastDeleted]);
-    setLastDeleted(null);
-  }, [lastDeleted]);
+  setLastDeleted(prevLast => {
+    if (!prevLast) return null;   // ✅ safely read the current value
 
-  return { tasks, loading, error, derivedSorted, metrics, lastDeleted, addTask, updateTask, deleteTask, undoDelete };
+    setTasks(prev => {
+      // ✅ avoid re-adding if ID already exists (edge case)
+      if (prev.some(t => t.id === prevLast.id)) return prev;
+      return [prevLast, ...prev];
+    });
+
+    return null; // ✅ clear lastDeleted once restored
+  });
+}, [])
+
+  const clearLastDeleted = useCallback(() => {
+  setLastDeleted(null);
+  }, []);
+
+  return { tasks, loading, error, derivedSorted, metrics, lastDeleted, addTask, updateTask, deleteTask, undoDelete, clearLastDeleted };
 }
 
 
