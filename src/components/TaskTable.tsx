@@ -6,6 +6,8 @@ import AddIcon from '@mui/icons-material/Add';
 import { DerivedTask, Task } from '@/types';
 import TaskForm from '@/components/TaskForm';
 import TaskDetailsDialog from '@/components/TaskDetailsDialog';
+import { useTasksContext } from '@/context/TasksContext';
+import UndoSnackbar from '@/components/UndoSnackbar';
 
 interface Props {
   tasks: DerivedTask[];
@@ -18,6 +20,8 @@ export default function TaskTable({ tasks, onAdd, onUpdate, onDelete }: Props) {
   const [openForm, setOpenForm] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
   const [details, setDetails] = useState<Task | null>(null);
+  const { undoDelete, clearLastDeleted } = useTasksContext();
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
 
   const existingTitles = useMemo(() => tasks.map(t => t.title), [tasks]);
 
@@ -38,6 +42,16 @@ export default function TaskTable({ tasks, onAdd, onUpdate, onDelete }: Props) {
       onAdd(value as Omit<Task, 'id'>);
     }
   };
+  const handleUndo = () => {
+  undoDelete();          // ✅ restores deleted task
+  setSnackbarOpen(false);
+};
+
+const handleCloseSnackbar = () => {
+  setSnackbarOpen(false);
+  clearLastDeleted();    // ✅ forgets old deleted task
+};
+
 
   return (
     <Card>
@@ -61,7 +75,7 @@ export default function TaskTable({ tasks, onAdd, onUpdate, onDelete }: Props) {
             </TableHead>
             <TableBody>
               {tasks.map(t => (
-                <TableRow key={t.id} hover onClick={() => setDetails(t)} sx={{ cursor: 'pointer' }}>
+                <TableRow  key={`${t.id ?? 'unknown'}-${t.title}-${Math.random().toString(36).slice(2, 7)}`} hover onClick={() => setDetails(t)} sx={{ cursor: 'pointer' }}>
                   <TableCell>
                     <Stack spacing={0.5}>
                       <Typography fontWeight={600}>{t.title}</Typography>
@@ -72,25 +86,28 @@ export default function TaskTable({ tasks, onAdd, onUpdate, onDelete }: Props) {
                           color="text.secondary"
                           noWrap
                           title={t.notes}
-                          dangerouslySetInnerHTML={{ __html: t.notes as unknown as string }}
-                        />
+                        >
+                          {t.notes}
+                        </Typography>
                       )}
                     </Stack>
                   </TableCell>
                   <TableCell align="right">${t.revenue.toLocaleString()}</TableCell>
                   <TableCell align="right">{t.timeTaken}</TableCell>
-                  <TableCell align="right">{t.roi == null ? 'N/A' : t.roi.toFixed(1)}</TableCell>
+                  <TableCell align="right"> {typeof t.roi === 'number' && Number.isFinite(t.roi)
+    ? t.roi.toFixed(2)
+    : '—'}</TableCell>
                   <TableCell>{t.priority}</TableCell>
                   <TableCell>{t.status}</TableCell>
                   <TableCell align="right">
                     <Stack direction="row" spacing={1} justifyContent="flex-end">
                       <Tooltip title="Edit">
-                        <IconButton onClick={() => handleEditClick(t)} size="small">
+                        <IconButton onClick={(e) => {e.stopPropagation();handleEditClick(t)}} size="small">
                           <EditIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Delete">
-                        <IconButton onClick={() => onDelete(t.id)} size="small" color="error">
+                        <IconButton onClick={(e) =>{ e.stopPropagation(); onDelete(t.id); setSnackbarOpen(true); }} size="small" color="error">
                           <DeleteIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
@@ -117,6 +134,12 @@ export default function TaskTable({ tasks, onAdd, onUpdate, onDelete }: Props) {
         initial={editing}
       />
       <TaskDetailsDialog open={!!details} task={details} onClose={() => setDetails(null)} onSave={onUpdate} />
+         {/* Snackbar for Undo */}
+<UndoSnackbar
+  open={snackbarOpen}
+  onClose={handleCloseSnackbar}
+  onUndo={handleUndo}
+/>     
     </Card>
   );
 }
